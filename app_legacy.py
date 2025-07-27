@@ -99,9 +99,9 @@ def get_recommendations(
     # Handle default parameter
     if previously_recommended is None:
         previously_recommended = []
-    
+
     logger.debug(f"Getting {num_recommendations} recommendations with mock={mock}. User context: '{user_context}'. Excluding {len(previously_recommended)} previous recommendations.")
-    
+
     if mock:
         # Return mock recommendations for testing, avoiding duplicates
         mock_songs = [
@@ -121,32 +121,32 @@ def get_recommendations(
             {"title": "Satisfaction", "artist": "Benny Benassi", "genre": "Electro House"},
             {"title": "One More Time", "artist": "Daft Punk", "genre": "French House"}
         ]
-        
+
         # Filter out previously recommended songs
         available_songs = []
         for song in mock_songs:
             is_duplicate = False
             for prev_song in previously_recommended:
-                if (song['title'].lower() == prev_song['title'].lower() and 
+                if (song['title'].lower() == prev_song['title'].lower() and
                     song['artist'].lower() == prev_song['artist'].lower()):
                     is_duplicate = True
                     break
             if not is_duplicate:
                 available_songs.append(song)
-        
+
         # Parse current song for mock response
         try:
             title, artist = current_song.rsplit(' - ', 1)
             mock_current_song = {"title": title.strip(), "artist": artist.strip(), "genre": "Electronic"}
         except ValueError:
             mock_current_song = {"title": current_song, "artist": "Unknown Artist", "genre": "Electronic"}
-        
+
         logger.info(f"Returning structured mock response with {num_recommendations} recommendations.")
         return {
             "current_song": mock_current_song,
             "recommended_songs": available_songs[:num_recommendations]
         }
-    
+
     try:
         logger.debug("Initializing Anthropic client.")
         # Securely retrieve API key from Streamlit secrets
@@ -155,17 +155,17 @@ def get_recommendations(
             logger.error("ANTHROPIC_API_KEY not found in Streamlit secrets.")
             st.error("Anthropic API key is not configured. Please add it to your secrets.")
             return []
-            
+
         client = anthropic.Anthropic(api_key=api_key)
-        
+
         # Construct a detailed prompt for the AI model
         user_context_section = f"\n\n**Additional Context/Guidelines from DJ:**\n{user_context}\n" if user_context.strip() else ""
-        
+
         # Add previously recommended songs section to avoid duplicates
         previously_recommended_section = ""
         if previously_recommended:
             previously_recommended_section = f"\n\n**Songs Already Recommended (DO NOT recommend these again):**\n{json.dumps(previously_recommended, indent=2)}\n"
-        
+
         # Interpret similarity level for the prompt
         if similarity_level >= 0.8:
             similarity_guidance = "very similar in genre, style, and energy"
@@ -177,7 +177,7 @@ def get_recommendations(
             similarity_guidance = "quite different but still cohesive"
         else:
             similarity_guidance = "very different, prioritizing variety and contrast"
-        
+
         prompt = f"""You are a world-class DJ and music expert. Your task is to suggest exactly {num_recommendations} songs to transition to from the current track, based on the provided context.
 
 **Set Context:**
@@ -214,7 +214,7 @@ Your response MUST be a single, valid JSON object with the following structure:
 
 For the current_song, parse the provided current song string to extract title and artist, and determine its genre. For recommended_songs, provide exactly {num_recommendations} songs with title, artist, and genre for each. Do not include any text outside of the JSON object.
 """
-        
+
         logger.debug(f"Sending request to Anthropic API using model: {model}")
         response = client.messages.create(
             model=model,
@@ -223,17 +223,17 @@ For the current_song, parse the provided current song string to extract title an
                 {"role": "user", "content": prompt}
             ]
         )
-        
+
         try:
             logger.debug("Successfully received response from AI. Parsing JSON.")
             json_response = json.loads(response.content[0].text)
-            
+
             # Extract structured response
             current_song_info = json_response.get("current_song", {})
             recommended_songs = json_response.get("recommended_songs", [])
-            
+
             logger.info(f"Received structured response: current_song={current_song_info}, {len(recommended_songs)} recommendations")
-            
+
             # Return both current song info and recommendations
             return {
                 "current_song": current_song_info,
@@ -243,7 +243,7 @@ For the current_song, parse the provided current song string to extract title an
             logger.error(f"Failed to parse AI response. Details: {str(e)}")
             st.error(f"Error parsing AI response: {str(e)}")
             return {"current_song": {}, "recommended_songs": []}
-            
+
     except Exception as e:
         logger.error(f"An exception occurred while getting recommendations: {str(e)}")
         st.error(f"Error getting recommendations: {str(e)}")
@@ -262,23 +262,23 @@ def get_all_recommended_songs_for_current_song(chat_history: List[Dict], current
         List[Dict[str, str]]: List of previously recommended songs for this current song
     """
     recommendations_for_current_song = []
-    
+
     # Find the most recent user message with this current song
     last_matching_user_index = -1
     for i in range(len(chat_history) - 1, -1, -1):
         chat = chat_history[i]
-        if (chat['type'] == 'user' and 
+        if (chat['type'] == 'user' and
             chat.get('current_song', chat.get('message', '')).strip().lower() == current_song.strip().lower()):
             last_matching_user_index = i
             break
-    
+
     # If we found a matching user message, collect all AI recommendations after it
     if last_matching_user_index != -1:
         for i in range(last_matching_user_index + 1, len(chat_history)):
             chat = chat_history[i]
             if chat['type'] == 'assistant' and 'recommendations' in chat:
                 recommendations_for_current_song.extend(chat['recommendations'])
-    
+
     logger.debug(f"Found {len(recommendations_for_current_song)} previously recommended songs for current song: '{current_song}'")
     return recommendations_for_current_song
 
@@ -293,7 +293,7 @@ def parse_user_message(message: str) -> tuple[str, str]:
         tuple[str, str]: (current_song, user_context)
     """
     logger.debug(f"Parsing user message: '{message}'")
-    
+
     # Define context indicators (transition words and phrases)
     context_indicators = [
         ' but ', ' however ', ' though ', ' although ',
@@ -302,27 +302,27 @@ def parse_user_message(message: str) -> tuple[str, str]:
         ' transition ', ' move ', ' shift ', ' change ', ' evolve ', ' next ',
         ';'  # semicolon as explicit separator
     ]
-    
+
     # Find the first occurrence of any context indicator
     split_pos = -1
     found_indicator = ""
-    
+
     for indicator in context_indicators:
         pos = message.lower().find(indicator.lower())
         if pos != -1 and (split_pos == -1 or pos < split_pos):
             split_pos = pos
             found_indicator = indicator
-    
+
     if split_pos != -1:
         # Split the message at the context indicator
         current_song = message[:split_pos].strip()
-        
+
         # For semicolon, don't include it in the context
         if found_indicator == ';':
             user_context = message[split_pos + 1:].strip()
         else:
             user_context = message[split_pos + len(found_indicator):].strip()
-        
+
         logger.debug(f"Parsed - Song: '{current_song}', Context: '{user_context}'")
         return current_song, user_context
     else:
@@ -334,10 +334,10 @@ def main():
     """Main function that sets up the Streamlit UI and handles user interactions."""
     st.set_page_config(page_title="DJ AI Assistant", layout="wide")
     st.title("🎧 DJ AI Assistant")
-    
+
     # Check if API key is available
     api_key = st.secrets.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
-    
+
     if not api_key:
         st.warning("🔑 **Anthropic API Key Required**")
         st.info("""
@@ -354,14 +354,14 @@ def main():
         
         **Option 3: Temporary Input (This Session Only)**
         """)
-        
+
         # Temporary API key input
         temp_api_key = st.text_input(
             "Enter your Anthropic API Key (temporary for this session):",
             type="password",
             help="This will only be stored for the current session and will be lost when you refresh the page."
         )
-        
+
         if temp_api_key:
             # Store temporarily in session state
             st.session_state.temp_api_key = temp_api_key
@@ -369,7 +369,7 @@ def main():
             st.rerun()
         else:
             st.stop()  # Stop execution until API key is provided
-    
+
     # Use temporary API key if available
     if not api_key and hasattr(st.session_state, 'temp_api_key'):
         api_key = st.session_state.temp_api_key
@@ -377,29 +377,29 @@ def main():
     # --- Sidebar with Settings, History, and Download ---
     with st.sidebar:
         st.header("⚙️ Settings")
-        
+
         # DJ Settings
         st.session_state.venue_type = st.selectbox(
-            "Venue Type", 
-            options=VENUE_TYPES, 
+            "Venue Type",
+            options=VENUE_TYPES,
             index=VENUE_TYPES.index(st.session_state.venue_type)
         )
-        
+
         st.session_state.energy_level = st.selectbox(
-            "Desired Energy Level", 
-            options=ENERGY_LEVELS, 
+            "Desired Energy Level",
+            options=ENERGY_LEVELS,
             index=ENERGY_LEVELS.index(st.session_state.energy_level)
         )
-        
+
         st.session_state.num_recommendations = st.number_input(
-            "Number of Recommendations", 
-            min_value=1, 
-            max_value=10, 
-            value=st.session_state.num_recommendations, 
+            "Number of Recommendations",
+            min_value=1,
+            max_value=10,
+            value=st.session_state.num_recommendations,
             step=1,
             help="Choose how many song recommendations you want (1-10)"
         )
-        
+
         st.session_state.similarity_level = st.slider(
             "Similarity Level",
             min_value=0.0,
@@ -408,25 +408,25 @@ def main():
             step=0.1,
             help="Control how similar recommendations should be to the current song (0.0 = very different, 1.0 = very similar)"
         )
-        
+
         # AI Model Selection
         available_models = [
             "claude-3-5-sonnet-20240620",
-            "claude-3-5-haiku-20241022", 
+            "claude-3-5-haiku-20241022",
             "claude-3-opus-20240229",
             "claude-3-sonnet-20240229",
             "claude-3-haiku-20240307",
             "claude-4-sonnet-20250115",
             "claude-4-opus-20250115"
         ]
-        
+
         st.session_state.selected_model = st.selectbox(
             "AI Model",
             options=available_models,
             index=available_models.index(st.session_state.selected_model) if st.session_state.selected_model in available_models else 0,
             help="Choose which Anthropic Claude model to use for recommendations. Claude 3.5 Sonnet offers the best balance of quality and speed."
         )
-        
+
         # Dev Mode
         with st.expander("Dev Mode"):
             st.session_state.mock_mode = st.toggle(
@@ -434,12 +434,12 @@ def main():
                 value=st.session_state.mock_mode,
                 help="If enabled, the app returns hardcoded data instead of calling the AI."
             )
-        
+
         st.divider()
-        
+
         # Play History Section
         st.header("🎶 Play & Recommendations History")
-        
+
         if st.session_state.play_and_recommendations_history:
             # Download button for play history
             import json
@@ -451,23 +451,23 @@ def main():
                 mime="application/json",
                 help="Download your play and recommendations history as a JSON file"
             )
-            
+
             # Display play history
             st.subheader("Recent Sessions")
             for i, entry in enumerate(st.session_state.play_and_recommendations_history[:5]):  # Show last 5 sessions
                 current_song = entry.get('current_song', {})
                 recommended_songs = entry.get('recommended_songs', [])
-                
+
                 with st.expander(f"🎵 {current_song.get('title', 'Unknown')} - {current_song.get('artist', 'Unknown')} ({current_song.get('genre', 'Unknown Genre')})"):
                     st.write(f"**Recommendations ({len(recommended_songs)}):**")
                     for j, rec in enumerate(recommended_songs[:5]):  # Show first 5 recommendations
                         st.write(f"  {j+1}. **{rec.get('title', 'Unknown')}** by {rec.get('artist', 'Unknown')} _{rec.get('genre', 'Unknown Genre')}_")
                     if len(recommended_songs) > 5:
                         st.caption(f"... and {len(recommended_songs) - 5} more recommendations")
-            
+
             if len(st.session_state.play_and_recommendations_history) > 5:
                 st.caption(f"... and {len(st.session_state.play_and_recommendations_history) - 5} more sessions")
-            
+
             # Clear history button
             if st.button("🗑️ Clear History", help="Clear all history"):
                 st.session_state.play_and_recommendations_history = []
@@ -476,10 +476,10 @@ def main():
                 st.rerun()
         else:
             st.info("No sessions yet. Start by asking for recommendations!")
-    
+
     # --- Main Chat Interface ---
     st.header("💬 Chat with DJ AI")
-    
+
     # Display chat history
     chat_container = st.container()
     with chat_container:
@@ -499,7 +499,7 @@ def main():
                     st.write("🎧 **DJ AI Recommendations:**")
                     for rec in chat['recommendations']:
                         st.write(f"- **{rec['title']}** by {rec['artist']}")
-                    
+
                     # Add re-recommend button for the most recent AI response
                     if i == len(st.session_state.chat_history) - 1:
                         if st.button("🔄 Get Different Recommendations", key=f"re_recommend_{i}"):
@@ -508,10 +508,10 @@ def main():
                             if user_chat and user_chat['type'] == 'user':
                                 current_song = user_chat.get('current_song', user_chat['message'])
                                 user_context = user_chat.get('user_context', '')
-                                
+
                                 # Get previously recommended songs for this current song only
                                 previously_recommended = get_all_recommended_songs_for_current_song(st.session_state.chat_history, current_song)
-                                
+
                                 with st.spinner('🎧 DJ AI is thinking of alternatives...'):
                                     ai_response = get_recommendations(
                                         current_song=current_song,
@@ -525,23 +525,23 @@ def main():
                                         model=st.session_state.selected_model,
                                         mock=st.session_state.mock_mode
                                     )
-                                    
+
                                     # Add a new AI message instead of overwriting the existing one
                                     st.session_state.chat_history.append({
                                         'type': 'assistant',
                                         'recommendations': ai_response.get('recommended_songs', []),
                                         'timestamp': datetime.now()
                                     })
-                                    
+
                                     logger.info(f"Added new recommendations for: '{current_song}'")
                                     st.rerun()
-    
+
     # Chat input with helpful placeholder
     user_message = st.chat_input(
         "Enter current song and context (e.g., 'Lose It - FISHER' or 'Animals - Martin Garrix; but let's bring the energy down after')...",
         key="song_input",
     )
-    
+
     # Show examples in an expander below the input (only when no chat history exists)
     if not st.session_state.chat_history:
         with st.expander("💡 Message Format Examples", expanded=False):
@@ -556,13 +556,13 @@ def main():
             - `Clarity - Zedd; I need to start playing more hip hop soon`
             - `Titanium - David Guetta however we should move toward underground tracks`
             """)
-    
+
     if user_message:
         logger.info(f"Chat message received: '{user_message}'.")
-        
+
         # Parse the message to extract song and context
         current_song, user_context = parse_user_message(user_message)
-        
+
         # Add user message to chat history
         st.session_state.chat_history.append({
             'type': 'user',
@@ -571,10 +571,10 @@ def main():
             'user_context': user_context,
             'timestamp': datetime.now()
         })
-        
+
         # Get previously recommended songs for this current song only
         previously_recommended = get_all_recommended_songs_for_current_song(st.session_state.chat_history, current_song)
-        
+
         with st.spinner('🎧 DJ AI is thinking...'):
             ai_response = get_recommendations(
                 current_song=current_song,
@@ -588,10 +588,10 @@ def main():
                 model=st.session_state.selected_model,
                 mock=st.session_state.mock_mode
             )
-            
+
             current_song_info = ai_response.get('current_song', {})
             recommended_songs = ai_response.get('recommended_songs', [])
-            
+
             # Update play_and_recommendations_history
             # Check if this current song already exists in history
             existing_entry = None
@@ -600,7 +600,7 @@ def main():
                     entry['current_song'].get('artist', '').lower() == current_song_info.get('artist', '').lower()):
                     existing_entry = entry
                     break
-            
+
             if existing_entry:
                 # Add new recommendations to existing entry
                 existing_entry['recommended_songs'].extend(recommended_songs)
@@ -611,14 +611,14 @@ def main():
                     'recommended_songs': recommended_songs,
                     'timestamp': datetime.now()
                 })
-            
+
             # Add AI response to chat history
             st.session_state.chat_history.append({
                 'type': 'assistant',
                 'recommendations': recommended_songs,
                 'timestamp': datetime.now()
             })
-            
+
             # Add to play history
             try:
                 title, artist = current_song.rsplit(' - ', 1)
@@ -628,7 +628,7 @@ def main():
             except ValueError:
                 logger.warning(f"Could not parse song '{current_song}'. Adding as a string.")
                 st.session_state.play_history.insert(0, {"title": current_song, "artist": ""})
-        
+
         # Rerun to show the new messages
         st.rerun()
 

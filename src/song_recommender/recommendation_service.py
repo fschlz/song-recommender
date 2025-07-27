@@ -8,7 +8,7 @@ Now uses Pydantic for enhanced JSON parsing and validation.
 
 import json
 import logging
-from typing import List, Optional
+from typing import Optional
 from anthropic import Anthropic
 from pydantic import ValidationError
 
@@ -21,18 +21,18 @@ logger = logging.getLogger(__name__)
 
 class RecommendationService:
     """Service for handling song recommendations with Pydantic validation."""
-    
+
     # Class-level flag to prevent repeated API key warnings
     _api_key_warning_logged = False
-    
+
     def __init__(self, api_key: Optional[str] = None):
         """Initialize the recommendation service with settings."""
         self.settings = get_settings()
         self.client = None
-        
+
         # Use provided API key or get from settings
         effective_api_key = api_key or self.settings.effective_api_key
-        
+
         if effective_api_key:
             try:
                 self.client = Anthropic(api_key=effective_api_key)
@@ -44,7 +44,7 @@ class RecommendationService:
             if not RecommendationService._api_key_warning_logged:
                 logger.warning("No API key available. Only mock mode will be available.")
                 RecommendationService._api_key_warning_logged = True
-    
+
     def get_recommendations(self, request: RecommendationRequest, mock: bool = False) -> RecommendationResponse:
         """
         Get song recommendations based on the request parameters.
@@ -58,7 +58,7 @@ class RecommendationService:
         """
         if mock:
             return self._get_mock_recommendations(request)
-        
+
         if not self.client:
             return RecommendationResponse(
                 current_song=Song(title="Unknown", artist="Unknown", genre="Unknown"),
@@ -66,7 +66,7 @@ class RecommendationService:
                 success=False,
                 error_message="Anthropic API key not configured"
             )
-        
+
         try:
             return self._get_ai_recommendations(request)
         except Exception as e:
@@ -77,35 +77,35 @@ class RecommendationService:
                 success=False,
                 error_message=str(e)
             )
-    
+
     def _get_mock_recommendations(self, request: RecommendationRequest) -> RecommendationResponse:
         """Get mock recommendations for testing."""
         logger.info("Using mock mode for recommendations.")
-        
+
         # Parse current song
         current_song = self._parse_current_song(request.current_song)
-        
+
         # Get mock recommendations
         mock_songs = get_mock_recommendations()
-        
+
         # Filter out previously recommended songs
         previously_recommended_titles = {song.title.lower() for song in request.previously_recommended}
-        available_songs = [song for song in mock_songs 
+        available_songs = [song for song in mock_songs
                           if song.title.lower() not in previously_recommended_titles]
-        
+
         # Select requested number of recommendations
         selected_songs = available_songs[:request.num_recommendations]
-        
+
         return RecommendationResponse(
             current_song=current_song,
             recommended_songs=selected_songs,
             success=True
         )
-    
+
     def _get_ai_recommendations(self, request: RecommendationRequest) -> RecommendationResponse:
         """Get recommendations from AI."""
         logger.info(f"Getting AI recommendations using model: {request.model}")
-        
+
         # Build context for previously recommended songs
         prev_songs_context = ""
         if request.previously_recommended:
@@ -114,7 +114,7 @@ class RecommendationService:
             
 Do NOT recommend any of these songs that were previously suggested for this current song:
 {chr(10).join(prev_songs_list)}"""
-        
+
         # Create the prompt
         prompt = f"""You are a professional DJ AI assistant. A DJ is playing "{request.current_song}" and needs {request.num_recommendations} song recommendations for their set.
 
@@ -151,27 +151,27 @@ Respond with ONLY the JSON object, no additional text."""
                 max_tokens=self.settings.max_tokens,
                 messages=[{"role": "user", "content": prompt}]
             )
-            
+
             response_text = response.content[0].text
             logger.debug(f"AI response: {response_text}")
-            
+
             # Parse JSON response using Pydantic validation
             try:
                 response_data = json.loads(response_text)
-                
+
                 # Extract and validate current song and recommendations using Pydantic
                 current_song_data = response_data.get("current_song", {})
                 recommended_songs_data = response_data.get("recommended_songs", [])
-                
+
                 current_song = Song.model_validate(current_song_data)
                 recommended_songs = [Song.model_validate(song) for song in recommended_songs_data]
-                
+
                 return RecommendationResponse(
                     current_song=current_song,
                     recommended_songs=recommended_songs,
                     success=True
                 )
-                
+
             except ValidationError as e:
                 logger.error(f"Pydantic validation failed for AI response: {e}")
                 return RecommendationResponse(
@@ -180,7 +180,7 @@ Respond with ONLY the JSON object, no additional text."""
                     success=False,
                     error_message=f"Invalid song data from AI: {e}"
                 )
-            
+
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse AI response as JSON: {e}")
             return RecommendationResponse(
@@ -197,7 +197,7 @@ Respond with ONLY the JSON object, no additional text."""
                 success=False,
                 error_message=f"API error: {e}"
             )
-    
+
     def _parse_current_song(self, current_song_input: str) -> Song:
         """Parse current song input to extract title and artist."""
         # Try to split by " - " to separate title and artist
@@ -208,5 +208,5 @@ Respond with ONLY the JSON object, no additional text."""
         else:
             title = current_song_input.strip()
             artist = "Unknown Artist"
-        
+
         return Song(title=title, artist=artist, genre="Unknown Genre")

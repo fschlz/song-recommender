@@ -24,25 +24,25 @@ def parse_user_message(message: str) -> Tuple[str, str]:
         r'song[:\s]+["\']?([^"\']+?)["\']?(?:\s+by\s+([^"\']+?))?(?:\s*[,.]|$)',
         r'track[:\s]+["\']?([^"\']+?)["\']?(?:\s+by\s+([^"\']+?))?(?:\s*[,.]|$)'
     ]
-    
+
     current_song = ""
     user_context = message
-    
+
     for pattern in song_patterns:
         match = re.search(pattern, message, re.IGNORECASE)
         if match:
             title = match.group(1).strip()
             artist = match.group(2).strip() if match.group(2) else ""
-            
+
             if artist:
                 current_song = f"{title} - {artist}"
             else:
                 current_song = title
-            
+
             # Remove the song part from the context
             user_context = re.sub(pattern, "", message, flags=re.IGNORECASE).strip()
             break
-    
+
     # If no pattern matched, assume the entire message is the song
     if not current_song:
         # Check if it looks like "Title - Artist" format
@@ -54,7 +54,7 @@ def parse_user_message(message: str) -> Tuple[str, str]:
             lines = message.split('\n', 1)
             current_song = lines[0].strip()
             user_context = lines[1].strip() if len(lines) > 1 else ""
-    
+
     return current_song, user_context
 
 
@@ -71,18 +71,18 @@ def get_previously_recommended_songs(chat_history: List[Dict], current_song: str
     """
     previously_recommended = []
     current_song_lower = current_song.lower()
-    
+
     # Find the most recent user message with this current song
     most_recent_user_index = -1
     for i in reversed(range(len(chat_history))):
-        if (chat_history[i].get('type') == 'user' and 
+        if (chat_history[i].get('type') == 'user' and
             chat_history[i].get('current_song', '').lower() == current_song_lower):
             most_recent_user_index = i
             break
-    
+
     if most_recent_user_index == -1:
         return previously_recommended
-    
+
     # Collect all AI recommendations after that user message
     for i in range(most_recent_user_index + 1, len(chat_history)):
         if chat_history[i].get('type') in ['assistant', 'ai']:
@@ -90,7 +90,7 @@ def get_previously_recommended_songs(chat_history: List[Dict], current_song: str
             for rec in recommendations:
                 if isinstance(rec, dict):
                     previously_recommended.append(Song.from_dict(rec))
-    
+
     return previously_recommended
 
 
@@ -124,12 +124,12 @@ def sanitize_filename(filename: str) -> str:
     # Replace invalid characters with underscores
     invalid_chars = r'[<>:"/\\|?*]'
     sanitized = re.sub(invalid_chars, '_', filename)
-    
+
     # Remove any trailing periods or spaces
     sanitized = sanitized.rstrip('. ')
-    
+
     # Ensure it's not empty
     if not sanitized:
         sanitized = "untitled"
-    
+
     return sanitized

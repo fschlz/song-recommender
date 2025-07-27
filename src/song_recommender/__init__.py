@@ -19,24 +19,24 @@ __version__ = "1.0.0"
 __all__ = [
     # Models
     'Song',
-    'RecommendationSession', 
+    'RecommendationSession',
     'RecommendationRequest',
     'RecommendationResponse',
-    
+
     # Services
     'RecommendationService',
-    
+
     # Settings
     'Settings',
     'get_settings',
     'reload_settings',
-    
+
     # Utilities
     'parse_user_message',
     'get_previously_recommended_songs',
     'format_song_display',
     'sanitize_filename',
-    
+
     # Mock data
     'get_mock_recommendations'
 ]

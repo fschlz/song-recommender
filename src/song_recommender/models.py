@@ -6,7 +6,7 @@ including Song, RecommendationSession, and request/response models.
 """
 
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from pydantic import BaseModel, Field, validator
 
 
@@ -15,14 +15,14 @@ class Song(BaseModel):
     title: str = Field(..., min_length=1, description="Song title")
     artist: str = Field(..., min_length=1, description="Artist name")
     genre: str = Field(..., min_length=1, description="Music genre")
-    
+
     @validator('title', 'artist', 'genre')
     def validate_non_empty_strings(cls, v):
         """Ensure strings are not empty or just whitespace."""
         if not v or not v.strip():
             raise ValueError('Field cannot be empty or whitespace')
         return v.strip()
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Song':
         """Create a Song from a dictionary with validation."""
@@ -31,7 +31,7 @@ class Song(BaseModel):
             artist=data.get('artist', ''),
             genre=data.get('genre', '')
         )
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert Song to dictionary."""
         return self.model_dump()
@@ -42,7 +42,7 @@ class RecommendationSession(BaseModel):
     current_song: Song = Field(..., description="The currently playing song")
     recommended_songs: List[Song] = Field(default=[], description="List of recommended songs")
     timestamp: datetime = Field(default_factory=datetime.now, description="Session timestamp")
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert session to dictionary format."""
         return self.model_dump()
@@ -67,7 +67,7 @@ class RecommendationRequest(BaseModel):
     similarity_level: float = Field(default=0.7, ge=0.0, le=1.0, description="Similarity level (0.0-1.0)")
     previously_recommended: List[Song] = Field(default=[], description="Previously recommended songs to exclude")
     model: str = Field(default="claude-3-5-sonnet-20240620", description="Anthropic model to use")
-    
+
     @validator('current_song')
     def validate_current_song(cls, v):
         """Ensure current song is not empty."""
