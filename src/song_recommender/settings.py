@@ -67,36 +67,15 @@ class Settings(BaseSettings):
         "extra": "ignore"  # Ignore extra environment variables
     }
     
-    def get_api_key_from_streamlit_secrets(self) -> str:
-        """
-        Get API key from Streamlit secrets if not found in environment.
-        
-        Returns:
-            str: The API key from Streamlit secrets or empty string if not found
-        """
-        try:
-            import streamlit as st
-            return st.secrets.get("ANTHROPIC_API_KEY", "")
-        except (ImportError, Exception):
-            return ""
-    
     @property
     def effective_api_key(self) -> str:
         """
-        Get the effective API key from environment or Streamlit secrets.
+        Get the effective API key from environment variables or .env file.
         
         Returns:
             str: The effective API key to use
         """
-        if self.anthropic_api_key:
-            return self.anthropic_api_key
-        
-        # Try to get from Streamlit secrets if environment variable is not set
-        streamlit_key = self.get_api_key_from_streamlit_secrets()
-        if streamlit_key:
-            return streamlit_key
-        
-        return ""
+        return self.anthropic_api_key
     
     @property
     def is_api_key_configured(self) -> bool:

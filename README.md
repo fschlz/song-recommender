@@ -107,14 +107,7 @@ README.md                # This documentation
    echo "ANTHROPIC_API_KEY=your_api_key_here" > .env
    ```
 
-   **Option B: Streamlit Secrets**
-
-   ```bash
-   mkdir -p .streamlit
-   echo 'ANTHROPIC_API_KEY = "your_api_key_here"' > .streamlit/secrets.toml
-   ```
-
-   **Option C: Runtime Input (Recommended for Testing)**
+   **Option B: Runtime Input (Recommended for Testing)**
    - Leave the .env file empty or commented out
    - The app will provide a sidebar input field for temporary API key entry
    - Perfect for testing without committing API keys to files
@@ -357,13 +350,7 @@ Develop your DJ intuition with AI guidance
 
 - `ANTHROPIC_API_KEY`: Your Anthropic API key
 - `MOCK_MODE`: Set to "true" to enable mock mode by default
-
-### Streamlit Secrets
-
-```toml
-# .streamlit/secrets.toml
-ANTHROPIC_API_KEY = "your_api_key_here"
-```
+- `LOG_LEVEL`: Set logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 
 ### Logging
 

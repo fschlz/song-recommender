@@ -21,15 +21,19 @@ import logging
 from datetime import datetime
 from typing import List, Dict
 from dotenv import load_dotenv
+from src.song_recommender.settings import get_settings
 from song_recommender.recommendation_service import RecommendationService
 from song_recommender.models import RecommendationRequest, RecommendationResponse
 
 # Load environment variables from .env file
 load_dotenv()
 
+# Initialize settings
+settings = get_settings()
+
 # --- Logger Setup ---
-# Configure logger to display debug messages
-logging.basicConfig(level=os.getenv("LOG_LEVEL", "DEBUG"), format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure logger to display debug messages using centralized settings
+logging.basicConfig(level=settings.log_level, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # --- Session State Initialization ---
@@ -38,9 +42,9 @@ if 'play_and_recommendations_history' not in st.session_state:
     logger.debug("Initializing 'play_and_recommendations_history' in session state.")
     st.session_state.play_and_recommendations_history = []
 
-# Initialize mock_mode in session state, defaulting to env var or False
+# Initialize mock_mode in session state, defaulting to centralized settings
 if 'mock_mode' not in st.session_state:
-    initial_mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
+    initial_mock_mode = settings.mock_mode
     logger.debug(f"Initializing 'mock_mode' in session state to: {initial_mock_mode}")
     st.session_state.mock_mode = initial_mock_mode
 
@@ -59,7 +63,7 @@ if 'num_recommendations' not in st.session_state:
 if 'similarity_level' not in st.session_state:
     st.session_state.similarity_level = 0.7
 if 'selected_model' not in st.session_state:
-    st.session_state.selected_model = "claude-3-5-sonnet-20240620"
+    st.session_state.selected_model = settings.default_model
 
 # Initialize recommendation service
 recommendation_service = RecommendationService()
@@ -160,8 +164,8 @@ def main():
         # API Key Configuration
         st.header("🔑 API Configuration")
         
-        # Check if API key is available
-        api_key = os.getenv("ANTHROPIC_API_KEY")
+        # Check if API key is available using centralized settings
+        api_key = settings.effective_api_key
         
         # Use temporary API key if available
         if not api_key and hasattr(st.session_state, 'temp_api_key'):
@@ -284,10 +288,10 @@ def main():
                 current_song = entry.get('current_song', {})
                 recommended_songs = entry.get('recommended_songs', [])
                 
-                with st.expander(f"🎵 {current_song.get('title', 'Unknown')} - {current_song.get('artist', 'Unknown')} ({current_song.get('genre', 'Unknown Genre')})"):
+                with st.expander(f"🎵 {current_song.get('title', 'Unknown')} - {current_song.get('artist', 'Unknown')} - {current_song.get('genre', 'Unknown Genre')}"):
                     st.write(f"**Recommendations ({len(recommended_songs)}):**")
-                    for j, rec in enumerate(recommended_songs[:10]):  # Show first 5 recommendations
-                        st.write(f"  {j+1}. **{rec.get('title', 'Unknown')}** by {rec.get('artist', 'Unknown')} _{rec.get('genre', 'Unknown Genre')}_")
+                    for j, rec in enumerate(recommended_songs[:10]):  # Show first 10 recommendations
+                        st.write(f"  {j+1}. **{rec.get('title', 'Unknown')} - {rec.get('artist', 'Unknown')} - {rec.get('genre', 'Unknown Genre')}**")
                     if len(recommended_songs) > 10:
                         st.caption(f"... and {len(recommended_songs) - 10} more recommendations")
             
@@ -320,11 +324,23 @@ def main():
                     else:
                         # Fallback for old format
                         st.write(f"🎵 **Now Playing:** {chat['message']}")
+                    
+                    # Show timestamp
+                    if 'timestamp' in chat:
+                        timestamp_str = chat['timestamp'].strftime("%H:%M:%S")
+                        st.caption(f"⏰ {timestamp_str}")
             else:  # AI response
                 with st.chat_message("assistant"):
                     st.write("🎧 **DJ AI Recommendations:**")
                     for rec in chat['recommendations']:
-                        st.write(f"- **{rec['title']}** by {rec['artist']}")
+                        # Display in "Title - Artist - Genre" format
+                        genre = rec.get('genre', 'Unknown Genre')
+                        st.write(f"- **{rec['title']} - {rec['artist']} - {genre}**")
+                    
+                    # Show timestamp
+                    if 'timestamp' in chat:
+                        timestamp_str = chat['timestamp'].strftime("%H:%M:%S")
+                        st.caption(f"⏰ {timestamp_str}")
                     
                     # Add re-recommend button for the most recent AI response
                     if i == len(st.session_state.chat_history) - 1:
@@ -352,8 +368,8 @@ def main():
                                         model=st.session_state.selected_model
                                     )
                                     
-                                    # Get effective API key (from environment or session state)
-                                    effective_api_key = os.getenv("ANTHROPIC_API_KEY")
+                                    # Get effective API key using centralized settings
+                                    effective_api_key = settings.effective_api_key
                                     if not effective_api_key and hasattr(st.session_state, 'temp_api_key'):
                                         effective_api_key = st.session_state.temp_api_key
                                     
@@ -467,13 +483,13 @@ def main():
                 model=st.session_state.selected_model
             )
             
-            # Get effective API key (from environment or session state)
-            effective_api_key = os.getenv("ANTHROPIC_API_KEY")
+            # Get effective API key using centralized settings
+            effective_api_key = settings.effective_api_key
             if not effective_api_key and hasattr(st.session_state, 'temp_api_key'):
                 effective_api_key = st.session_state.temp_api_key
             
             # Create recommendation service with the effective API key
-            logger.debug(f"Using API key from: {'environment' if os.getenv('ANTHROPIC_API_KEY') else 'session state' if effective_api_key else 'none'}")
+            logger.debug(f"Using API key from: {'environment' if settings.anthropic_api_key else 'session state' if effective_api_key else 'none'}")
             current_recommendation_service = RecommendationService(api_key=effective_api_key)
             
             # Get recommendations using the service
