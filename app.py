@@ -279,20 +279,20 @@ def main():
             )
             
             # Display play history
-            st.subheader("Recent Sessions")
-            for i, entry in enumerate(st.session_state.play_and_recommendations_history[:5]):  # Show last 5 sessions
+            st.subheader("Last 10 Songs")
+            for i, entry in enumerate(st.session_state.play_and_recommendations_history[:10]):  # Show last 5 sessions
                 current_song = entry.get('current_song', {})
                 recommended_songs = entry.get('recommended_songs', [])
                 
                 with st.expander(f"🎵 {current_song.get('title', 'Unknown')} - {current_song.get('artist', 'Unknown')} ({current_song.get('genre', 'Unknown Genre')})"):
                     st.write(f"**Recommendations ({len(recommended_songs)}):**")
-                    for j, rec in enumerate(recommended_songs[:5]):  # Show first 5 recommendations
+                    for j, rec in enumerate(recommended_songs[:10]):  # Show first 5 recommendations
                         st.write(f"  {j+1}. **{rec.get('title', 'Unknown')}** by {rec.get('artist', 'Unknown')} _{rec.get('genre', 'Unknown Genre')}_")
-                    if len(recommended_songs) > 5:
-                        st.caption(f"... and {len(recommended_songs) - 5} more recommendations")
+                    if len(recommended_songs) > 10:
+                        st.caption(f"... and {len(recommended_songs) - 10} more recommendations")
             
-            if len(st.session_state.play_and_recommendations_history) > 5:
-                st.caption(f"... and {len(st.session_state.play_and_recommendations_history) - 5} more sessions")
+            if len(st.session_state.play_and_recommendations_history) > 10:
+                st.caption(f"... and {len(st.session_state.play_and_recommendations_history) - 10} more sessions")
             
             # Clear history button
             if st.button("🗑️ Clear History", help="Clear all history"):
@@ -373,14 +373,40 @@ def main():
                                         for song in ai_response.recommended_songs
                                     ]
                                     
-                                    # Add a new AI message instead of overwriting the existing one
+                                    # Update play_and_recommendations_history with new recommendations
+                                    # Find the existing entry for this current song
+                                    current_song_info = {
+                                        'title': ai_response.current_song.title,
+                                        'artist': ai_response.current_song.artist,
+                                        'genre': ai_response.current_song.genre
+                                    }
+                                    
+                                    existing_entry = None
+                                    for entry in st.session_state.play_and_recommendations_history:
+                                        if (entry['current_song'].get('title', '').lower() == current_song_info.get('title', '').lower() and
+                                            entry['current_song'].get('artist', '').lower() == current_song_info.get('artist', '').lower()):
+                                            existing_entry = entry
+                                            break
+                                    
+                                    if existing_entry:
+                                        # Add new recommendations to existing entry
+                                        existing_entry['recommended_songs'].extend(recommended_songs)
+                                    else:
+                                        # This shouldn't happen, but create new entry as fallback
+                                        st.session_state.play_and_recommendations_history.insert(0, {
+                                            'current_song': current_song_info,
+                                            'recommended_songs': recommended_songs,
+                                            'timestamp': datetime.now()
+                                        })
+                                    
+                                    # Add a new AI message instead of overwriting the existing one (create independent copy)
                                     st.session_state.chat_history.append({
                                         'type': 'assistant',
-                                        'recommendations': recommended_songs,
+                                        'recommendations': [rec.copy() for rec in recommended_songs],  # Independent copy
                                         'timestamp': datetime.now()
                                     })
                                     
-                                    logger.info(f"Added new recommendations for: '{current_song}'")
+                                    logger.info(f"Added new recommendations for: '{current_song}' to both chat and history")
                                     st.rerun()
     
     # Chat input with helpful placeholder
@@ -495,10 +521,10 @@ def main():
                     'timestamp': datetime.now()
                 })
             
-            # Add AI response to chat history
+            # Add AI response to chat history (create independent copy to avoid reference sharing)
             st.session_state.chat_history.append({
                 'type': 'assistant',
-                'recommendations': recommended_songs,
+                'recommendations': [rec.copy() for rec in recommended_songs],  # Independent copy
                 'timestamp': datetime.now()
             })
             
