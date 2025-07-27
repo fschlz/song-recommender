@@ -10,11 +10,15 @@ from typing import List, Dict, Any
 from pydantic import BaseModel, Field, validator
 
 
+from typing import Optional
+
+
 class Song(BaseModel):
     """Represents a song with title, artist, and genre."""
     title: str = Field(..., min_length=1, description="Song title")
     artist: str = Field(..., min_length=1, description="Artist name")
     genre: str = Field(..., min_length=1, description="Music genre")
+    reason: Optional[str] = Field(default=None, description="Reason for the recommendation")
 
     @validator('title', 'artist', 'genre')
     def validate_non_empty_strings(cls, v):
@@ -64,9 +68,23 @@ class RecommendationRequest(BaseModel):
     energy_level: str = Field(..., description="Desired energy level (Low, Medium, High, Peak)")
     num_recommendations: int = Field(default=3, ge=1, le=10, description="Number of recommendations")
     user_context: str = Field(default="", description="Additional context from user")
-    similarity_level: float = Field(default=0.7, ge=0.0, le=1.0, description="Similarity level (0.0-1.0)")
+    similarity_level: str = Field(default="Similar with variation", description="Similarity level category")
     previously_recommended: List[Song] = Field(default=[], description="Previously recommended songs to exclude")
     model: str = Field(default="claude-3-5-sonnet-20240620", description="Anthropic model to use")
+
+    @validator('similarity_level')
+    def validate_similarity_level(cls, v):
+        """Ensure similarity level is one of the valid categories."""
+        valid_levels = [
+            "Very similar",
+            "Similar with variation",
+            "Moderately different",
+            "Quite different",
+            "Very different"
+        ]
+        if v not in valid_levels:
+            raise ValueError(f'Similarity level must be one of: {", ".join(valid_levels)}')
+        return v
 
     @validator('current_song')
     def validate_current_song(cls, v):

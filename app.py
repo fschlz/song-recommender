@@ -58,7 +58,7 @@ if 'energy_level' not in st.session_state:
 if 'num_recommendations' not in st.session_state:
     st.session_state.num_recommendations = 3
 if 'similarity_level' not in st.session_state:
-    st.session_state.similarity_level = 0.7
+    st.session_state.similarity_level = "Similar with variation"
 if 'selected_model' not in st.session_state:
     st.session_state.selected_model = settings.default_model
 
@@ -218,7 +218,7 @@ def main():
             index=ENERGY_LEVELS.index(st.session_state.energy_level)
         )
 
-        st.session_state.num_recommendations = st.number_input(
+        st.session_state.num_recommendations = st.slider(
             "Number of Recommendations",
             min_value=1,
             max_value=10,
@@ -227,13 +227,19 @@ def main():
             help="Choose how many song recommendations you want (1-10)"
         )
 
-        st.session_state.similarity_level = st.slider(
+        similarity_options = [
+            "Very similar",
+            "Similar with variation",
+            "Moderately different",
+            "Quite different",
+            "Very different"
+        ]
+        
+        st.session_state.similarity_level = st.selectbox(
             "Similarity Level",
-            min_value=0.0,
-            max_value=1.0,
-            value=st.session_state.similarity_level,
-            step=0.1,
-            help="Control how similar recommendations should be to the current song (0.0 = very different, 1.0 = very similar)"
+            options=similarity_options,
+            index=similarity_options.index(st.session_state.similarity_level),
+            help="Control how similar recommendations should be to the current song"
         )
 
         # AI Model Selection
@@ -334,6 +340,10 @@ def main():
                         genre = rec.get('genre', 'Unknown Genre')
                         st.write(f"- **{rec['title']} - {rec['artist']} - {genre}**")
 
+                        # Display the reason if it exists and is not empty
+                        if rec.get('reason'):
+                            st.markdown(f"> *{rec.get('reason')}*")
+
                     # Show timestamp
                     if 'timestamp' in chat:
                         timestamp_str = chat['timestamp'].strftime("%H:%M:%S")
@@ -374,7 +384,7 @@ def main():
                                     current_recommendation_service = RecommendationService(api_key=effective_api_key)
 
                                     # Get recommendations using the service
-                                    ai_response = current_recommendation_service.get_recommendations(request, mock=st.session_state.mock_mode)
+                                    ai_response = current_recommendation_service.get_recommendations(request)
 
                                     # Extract recommended songs from RecommendationResponse
                                     recommended_songs = [
@@ -490,8 +500,7 @@ def main():
             current_recommendation_service = RecommendationService(api_key=effective_api_key)
 
             # Get recommendations using the service
-            logger.debug(f"Calling recommendation service with mock={st.session_state.mock_mode}")
-            ai_response = current_recommendation_service.get_recommendations(request, mock=st.session_state.mock_mode)
+            ai_response = current_recommendation_service.get_recommendations(request)
             logger.debug(f"Received response: success={ai_response.success}, num_recommendations={len(ai_response.recommended_songs)}")
 
             if not ai_response.success:

@@ -80,19 +80,19 @@ def get_recommendations(
 ) -> List[Dict[str, str]]:
     """
     Get song recommendations based on current track and set context.
-    
+
     Args:
         current_song (str): The current song title and artist
-        play_history (List[Dict[str, str]]): List of songs already played
-        venue_type (str): Type of venue (e.g., Club, Wedding)
-        energy_level (str): Desired energy level (e.g., Low, High)
-        num_recommendations (int): Number of recommendations to return (1-10)
-        user_context (str): Additional context/guidelines from the user about set direction
-        similarity_level (float): How similar recommendations should be (0.0-1.0)
+        play_history (List[Dict[str, str]]): List of previously played songs
+        venue_type (str): The type of venue (e.g., 'Club', 'Festival', 'Bar')
+        energy_level (str): Desired energy level (e.g., 'Low', 'High')
+        num_recommendations (int): Number of recommendations to generate
+        user_context (str): Additional context or requests from the user
+        similarity_level (float): How similar the recommendations should be (0.0 to 1.0)
         previously_recommended (List[Dict[str, str]]): Songs already recommended to avoid duplicates
         model (str): Anthropic model to use for recommendations (e.g., claude-3-5-sonnet-20240620)
         mock (bool): If True, returns hardcoded recommendations for testing
-        
+
     Returns:
         List[Dict[str, str]]: List of recommended songs with title and artist
     """
@@ -100,7 +100,10 @@ def get_recommendations(
     if previously_recommended is None:
         previously_recommended = []
 
-    logger.debug(f"Getting {num_recommendations} recommendations with mock={mock}. User context: '{user_context}'. Excluding {len(previously_recommended)} previous recommendations.")
+    logger.debug(
+        f"Getting recommendations for '{current_song}' with context: {user_context}'. "
+        f"Excluding {len(previously_recommended)} previous recommendations."
+    )
 
     if mock:
         # Return mock recommendations for testing, avoiding duplicates
@@ -164,7 +167,10 @@ def get_recommendations(
         # Add previously recommended songs section to avoid duplicates
         previously_recommended_section = ""
         if previously_recommended:
-            previously_recommended_section = f"\n\n**Songs Already Recommended (DO NOT recommend these again):**\n{json.dumps(previously_recommended, indent=2)}\n"
+            previously_recommended_section = (
+                f"**Previously Recommended (do not recommend these again):**\n"
+                f"{json.dumps(previously_recommended, indent=2)}\n"
+            )
 
         # Interpret similarity level for the prompt
         if similarity_level >= 0.8:
@@ -178,7 +184,8 @@ def get_recommendations(
         else:
             similarity_guidance = "very different, prioritizing variety and contrast"
 
-        prompt = f"""You are a world-class DJ and music expert. Your task is to suggest exactly {num_recommendations} songs to transition to from the current track, based on the provided context.
+        prompt = (
+            f"""You are a world-class DJ and music expert. Your task is to suggest exactly {num_recommendations} songs to transition to from the current track, based on the provided context.
 
 **Set Context:**
 - Venue: {venue_type}
@@ -190,9 +197,10 @@ def get_recommendations(
 
 **Songs Already Played in this Set:**
 {json.dumps(play_history, indent=2)}{previously_recommended_section}{user_context_section}
-Analyze the context, including the current song, play history, venue, desired energy, and similarity preference{', and the DJ\'s additional guidelines' if user_context.strip() else ''}. Suggest songs that are harmonically compatible, maintain a smooth energy flow, and are appropriate for the crowd{'. Pay special attention to any specific directions or preferences mentioned by the DJ' if user_context.strip() else ''}.
+Analyze the context, including the current song, play history, venue, desired energy, and similarity preference{', and the DJ\'s additional guidelines' if user_context.strip() else ''}.
+Suggest songs that are harmonically compatible, maintain a smooth energy flow, and are appropriate for the crowd{'. Pay special attention to any specific directions or preferences mentioned by the DJ' if user_context.strip() else ''}.
 
-IMPORTANT: 
+IMPORTANT:
 1. The similarity level of {similarity_level:.1f} means your recommendations should be {similarity_guidance} to the current song.
 2. NEVER recommend any songs from the "Songs Already Recommended" list - these have been suggested before and should be completely avoided.
 
@@ -214,6 +222,7 @@ Your response MUST be a single, valid JSON object with the following structure:
 
 For the current_song, parse the provided current song string to extract title and artist, and determine its genre. For recommended_songs, provide exactly {num_recommendations} songs with title, artist, and genre for each. Do not include any text outside of the JSON object.
 """
+        )
 
         logger.debug(f"Sending request to Anthropic API using model: {model}")
         response = client.messages.create(
@@ -250,14 +259,14 @@ For the current_song, parse the provided current song string to extract title an
         return {"current_song": {}, "recommended_songs": []}
 
 def get_all_recommended_songs_for_current_song(chat_history: List[Dict], current_song: str) -> List[Dict[str, str]]:
-    """
-    Extract previously recommended songs from chat history for the same current song to avoid duplicates.
+    """Extract previously recommended songs from chat history for the same current song to avoid duplicates.
+
     Only looks at recommendations that came after the most recent user message with the same current song.
-    
+
     Args:
         chat_history (List[Dict]): The chat history from session state
         current_song (str): The current song to find recommendations for
-        
+
     Returns:
         List[Dict[str, str]]: List of previously recommended songs for this current song
     """
@@ -283,12 +292,11 @@ def get_all_recommended_songs_for_current_song(chat_history: List[Dict], current
     return recommendations_for_current_song
 
 def parse_user_message(message: str) -> tuple[str, str]:
-    """
-    Parse user message to extract current song and additional context.
-    
+    """Parse user message to extract current song and additional context.
+
     Args:
         message (str): The user's input message
-        
+
     Returns:
         tuple[str, str]: (current_song, user_context)
     """
@@ -340,20 +348,18 @@ def main():
 
     if not api_key:
         st.warning("🔑 **Anthropic API Key Required**")
-        st.info("""
-        To use the DJ AI Assistant, you need to provide your Anthropic API key.
-        
-        **Option 1: Environment Variable (Recommended)**
-        - Add `ANTHROPIC_API_KEY=your_key_here` to your `.env` file
-        
-        **Option 2: Streamlit Secrets**
-        - Add your key to `.streamlit/secrets.toml`:
-        ```toml
-        ANTHROPIC_API_KEY = "your_key_here"
-        ```
-        
-        **Option 3: Temporary Input (This Session Only)**
-        """)
+        st.info(
+            """To use the DJ AI Assistant, you need to provide your Anthropic API key.\n
+**Option 1: Environment Variable (Recommended)**
+- Add `ANTHROPIC_API_KEY=your_key_here` to your `.env` file\n
+**Option 2: Streamlit Secrets**
+- Add your key to `.streamlit/secrets.toml`:
+```toml
+ANTHROPIC_API_KEY = "your_key_here"
+```\n
+**Option 3: Temporary Input (This Session Only)**
+"""
+        )
 
         # Temporary API key input
         temp_api_key = st.text_input(

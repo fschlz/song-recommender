@@ -10,10 +10,10 @@ from .models import Song
 def parse_user_message(message: str) -> Tuple[str, str]:
     """
     Parse user message to extract current song and additional context.
-    
+
     Args:
         message: The user's input message
-        
+
     Returns:
         tuple: (current_song, user_context)
     """
@@ -61,11 +61,11 @@ def parse_user_message(message: str) -> Tuple[str, str]:
 def get_previously_recommended_songs(chat_history: List[Dict], current_song: str) -> List[Song]:
     """
     Extract previously recommended songs from chat history for the same current song.
-    
+
     Args:
         chat_history: The chat history from session state
         current_song: The current song to find recommendations for
-        
+
     Returns:
         List of previously recommended songs for this current song
     """
@@ -97,11 +97,11 @@ def get_previously_recommended_songs(chat_history: List[Dict], current_song: str
 def format_song_display(song: Song, include_genre: bool = True) -> str:
     """
     Format a song for display in the UI.
-    
+
     Args:
         song: Song object to format
         include_genre: Whether to include genre information
-        
+
     Returns:
         Formatted string representation of the song
     """
@@ -114,10 +114,10 @@ def format_song_display(song: Song, include_genre: bool = True) -> str:
 def sanitize_filename(filename: str) -> str:
     """
     Sanitize a filename by removing/replacing invalid characters.
-    
+
     Args:
         filename: The filename to sanitize
-        
+
     Returns:
         Sanitized filename safe for filesystem use
     """

@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     def effective_api_key(self) -> str:
         """
         Get the effective API key from environment variables or .env file.
-        
+
         Returns:
             str: The effective API key to use
         """
@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     def is_api_key_configured(self) -> bool:
         """
         Check if API key is properly configured.
-        
+
         Returns:
             bool: True if API key is available, False otherwise
         """
@@ -94,7 +94,7 @@ settings = Settings()
 def get_settings() -> Settings:
     """
     Get the global settings instance.
-    
+
     Returns:
         Settings: The application settings
     """
@@ -104,7 +104,7 @@ def get_settings() -> Settings:
 def reload_settings() -> Settings:
     """
     Reload settings from environment and configuration files.
-    
+
     Returns:
         Settings: The reloaded settings instance
     """
